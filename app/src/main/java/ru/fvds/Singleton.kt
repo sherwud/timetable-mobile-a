@@ -1,6 +1,7 @@
 package ru.fvds
 
 // okhttp3
+import kotlinx.serialization.DeserializationStrategy
 import okhttp3.*
 // JSON
 import kotlinx.serialization.json.*
@@ -18,11 +19,13 @@ import java.lang.Exception
  * @param callback функция-обработчик, успешного выполнения запроса
  * @param errback функция-обработчик, ошибки, возникшей при целевом вызове
  */
-fun doGetReuest (url: String,
-                 params: Map<String, String>,
-                 callback: (res: String) -> Unit,
+fun <T> doGetReuest (url: String,
+                 params: Map<String, Any>,
+                 deserializationStrategy: DeserializationStrategy<T>,
+                 callback: (res: T) -> Unit,
                  errback: (ex: Exception) -> Unit) {
     try {
+        val json = Json(JsonConfiguration.Stable)
         // генерация url для GET запроса
         val urlBuilder = StringBuilder()
 
@@ -43,8 +46,9 @@ fun doGetReuest (url: String,
             }
             override fun onResponse(call: Call, response: Response) {
                 try {
-                    val res = response.body()?.string().toString()
-                    callback(res)
+                    val bodyStr = (response.body()?.string() ?: "").toString()
+                    val jsonVal = json.parse(deserializationStrategy, bodyStr)
+                    callback(jsonVal)
                 }
                 catch (ex: Exception) {
                     errback(ex)
@@ -66,9 +70,10 @@ fun doGetReuest (url: String,
  * @param errback функция-обработчик, ошибки, возникшей при целевом вызове
  */
 @ImplicitReflectionSerializer
-fun doPostRequest (url:String,
-                   params: Map <String, String>,
-                   callback: (res: String) -> Unit,
+fun <T> doPostRequest (url:String,
+                   params: JsonObject,
+                   deserializationStrategy: DeserializationStrategy<T>,
+                   callback: (res: T) -> Unit,
                    errback: (ex: Exception) -> Unit) {
 
     val json = Json(JsonConfiguration.Stable)
@@ -83,78 +88,12 @@ fun doPostRequest (url:String,
         }
         override fun onResponse(call: Call, response: Response) {
             try {
-                callback(response.body()?.string().toString())
+                val bodyStr = (response.body()?.string() ?: "").toString()
+                val jsonVal = json.parse(deserializationStrategy, bodyStr)
+                callback(jsonVal)
             }
             catch (ex: Exception) {
                 errback(ex)
-            }
-        }
-    })
-}
-
-
-@ImplicitReflectionSerializer
-fun onConnectBtnClickByOkhttpPostSingle() {
-
-    val json = Json(JsonConfiguration.Stable)
-
-    val url = "http://usd-suhanov.corp.tensor.ru:1444/test_page_2/"
-    // val url = "http://test.fvds.ru/bl/api.php"
-
-    @Serializable
-    class Field {
-        var mystatus: Int = 0
-        var mymessage: String = ""
-        var myextmessage: String = "42"
-    }
-
-    val postBody = "{\"name123\": \"morpheus\"}"
-    val params = json.stringify(mapOf(
-        "period" to "2019-11-01",
-        "user" to "Ринат Абрамович"
-    ))
-
-
-    val client = OkHttpClient()
-    val body = RequestBody.create(MediaType.parse("application/json; charset=utf-8"), params)
-
-    val request = Request.Builder().url(url).post(body).build()
-
-    client.newCall(request).enqueue(object : Callback {
-        override fun onFailure(call: Call, e: IOException) {
-            val myErr = "Fuck is: ${e.message}"
-        }
-        override fun onResponse(call: Call, response: Response) {
-            try {
-                //val a = "Response is: ${response.body()?.string()}"
-                val res = response.body()?.string().toString()
-                val new_res = json.parse(Field.serializer(), res)
-
-            }
-            catch (e: Exception) {
-                val a = 5
-            }
-        }
-    })
-}
-
-fun onConnectBtnClickByOkhttpGetSingle() {
-
-    // val url = "http://usd-suhanov.corp.tensor.ru:1444/test_page_2/"
-    val url = "http://test.fvds.ru/bl/api.php"
-    val client = OkHttpClient()
-    val request = Request.Builder().url(url).build()
-
-    client.newCall(request).enqueue(object : Callback {
-        override fun onFailure(call: Call, e: IOException) {
-            val myErr = "Fuck is: ${e.message}"
-        }
-        override fun onResponse(call: Call, response: Response) {
-            try {
-                val a = "Response is: ${response.body()?.string()}"
-            }
-            catch (e: Exception) {
-                val a = 5
             }
         }
     })
